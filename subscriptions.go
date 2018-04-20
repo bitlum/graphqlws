@@ -7,7 +7,6 @@ import (
 	"github.com/graphql-go/graphql/gqlerrors"
 	"github.com/graphql-go/graphql/language/ast"
 	"github.com/graphql-go/graphql/language/parser"
-	log "github.com/sirupsen/logrus"
 )
 
 // ErrorsFromGraphQLErrors convert from GraphQL errors to regular errors.
@@ -90,14 +89,12 @@ type SubscriptionManager interface {
 type subscriptionManager struct {
 	subscriptions Subscriptions
 	schema        *graphql.Schema
-	logger        *log.Entry
 }
 
 // NewSubscriptionManager creates a new subscription manager.
 func NewSubscriptionManager(schema *graphql.Schema) SubscriptionManager {
 	manager := new(subscriptionManager)
 	manager.subscriptions = make(Subscriptions)
-	manager.logger = NewLogger("subscriptions")
 	manager.schema = schema
 	return manager
 }
@@ -110,13 +107,7 @@ func (m *subscriptionManager) AddSubscription(
 	conn Connection,
 	subscription *Subscription,
 ) []error {
-	m.logger.WithFields(log.Fields{
-		"conn":         conn.ID(),
-		"subscription": subscription.ID,
-	}).Info("Add subscription")
-
 	if errors := validateSubscription(subscription); len(errors) > 0 {
-		m.logger.WithField("errors", errors).Warn("Failed to add invalid subscription")
 		return errors
 	}
 
@@ -125,16 +116,12 @@ func (m *subscriptionManager) AddSubscription(
 		Source: subscription.Query,
 	})
 	if err != nil {
-		m.logger.WithField("err", err).Warn("Failed to parse subscription query")
 		return []error{err}
 	}
 
 	// Validate the query document
 	validation := graphql.ValidateDocument(m.schema, document, nil)
 	if !validation.IsValid {
-		m.logger.WithFields(log.Fields{
-			"errors": validation.Errors,
-		}).Warn("Failed to validate subscription query")
 		return ErrorsFromGraphQLErrors(validation.Errors)
 	}
 
@@ -152,10 +139,6 @@ func (m *subscriptionManager) AddSubscription(
 
 	// Add the subscription if it hasn't already been added
 	if m.subscriptions[conn][subscription.ID] != nil {
-		m.logger.WithFields(log.Fields{
-			"conn":         conn.ID(),
-			"subscription": subscription.ID,
-		}).Warn("Cannot register subscription twice")
 		return []error{errors.New("Cannot register subscription twice")}
 	}
 
@@ -168,11 +151,6 @@ func (m *subscriptionManager) RemoveSubscription(
 	conn Connection,
 	subscription *Subscription,
 ) {
-	m.logger.WithFields(log.Fields{
-		"conn":         conn.ID(),
-		"subscription": subscription.ID,
-	}).Info("Remove subscription")
-
 	// Remove the subscription from its connections' subscription map
 	delete(m.subscriptions[conn], subscription.ID)
 
@@ -183,10 +161,6 @@ func (m *subscriptionManager) RemoveSubscription(
 }
 
 func (m *subscriptionManager) RemoveSubscriptions(conn Connection) {
-	m.logger.WithFields(log.Fields{
-		"conn": conn.ID(),
-	}).Info("Remove subscriptions")
-
 	// Only remove subscriptions if we know the connection
 	if m.subscriptions[conn] != nil {
 		// Remove subscriptions one by one

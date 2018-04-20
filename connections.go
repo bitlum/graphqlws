@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -125,7 +124,6 @@ type connection struct {
 	id         string
 	ws         *websocket.Conn
 	config     ConnectionConfig
-	logger     *log.Entry
 	outgoing   chan OperationMessage
 	user       interface{}
 	closeMutex *sync.Mutex
@@ -146,7 +144,6 @@ func NewConnection(ws *websocket.Conn, config ConnectionConfig) Connection {
 	conn.id = uuid.New().String()
 	conn.ws = ws
 	conn.config = config
-	conn.logger = NewLogger("connection/" + conn.id)
 	conn.closed = false
 	conn.closeMutex = &sync.Mutex{}
 
@@ -154,8 +151,6 @@ func NewConnection(ws *websocket.Conn, config ConnectionConfig) Connection {
 
 	go conn.writeLoop()
 	go conn.readLoop()
-
-	conn.logger.Info("Created connection")
 
 	return conn
 }
@@ -214,8 +209,6 @@ func (conn *connection) close() {
 	if conn.config.EventHandlers.Close != nil {
 		conn.config.EventHandlers.Close(conn)
 	}
-
-	conn.logger.Info("Closed connection")
 }
 
 func (conn *connection) writeLoop() {
@@ -234,19 +227,12 @@ func (conn *connection) writeLoop() {
 				return
 			}
 
-			conn.logger.WithFields(log.Fields{
-				"msg": msg.String(),
-			}).Debug("Send message")
-
 			conn.ws.SetWriteDeadline(time.Now().Add(writeTimeout))
 
 			// Send the message to the client; if this times out, the WebSocket
 			// connection will be corrupt, hence we need to close the write loop
 			// and the connection immediately
 			if err := conn.ws.WriteJSON(msg); err != nil {
-				conn.logger.WithFields(log.Fields{
-					"err": err,
-				}).Warn("Sending message failed")
 				return
 			}
 		}
@@ -271,17 +257,9 @@ func (conn *connection) readLoop() {
 		// see https://github.com/gorilla/websocket/blob/master/conn.go#L924 for
 		// more information on why this is necessary
 		if err != nil {
-			conn.logger.WithFields(log.Fields{
-				"reason": err,
-			}).Warn("Closing connection")
 			conn.close()
 			return
 		}
-
-		conn.logger.WithFields(log.Fields{
-			"id":   msg.ID,
-			"type": msg.Type,
-		}).Debug("Received message")
 
 		switch msg.Type {
 
@@ -329,17 +307,12 @@ func (conn *connection) readLoop() {
 		// When the GraphQL WS connection is terminated by the client,
 		// close the connection and close the read loop
 		case gqlConnectionTerminate:
-			conn.logger.Debug("Connection terminated by client")
 			conn.close()
 			return
 
 		// GraphQL WS protocol messages that are not handled represent
-		// a bug in our implementation; make this very obvious by logging
-		// an error
+		// a bug in our implementation
 		default:
-			conn.logger.WithFields(log.Fields{
-				"msg": msg.String(),
-			}).Error("Unhandled message")
 		}
 	}
 }

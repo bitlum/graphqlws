@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
-	log "github.com/sirupsen/logrus"
 )
 
 // HandlerConfig stores the configuration of a GraphQL WebSocket handler.
@@ -24,7 +23,6 @@ func NewHandler(config HandlerConfig) http.Handler {
 		Subprotocols: []string{"graphql-ws"},
 	}
 
-	logger := NewLogger("handler")
 	subscriptionManager := config.SubscriptionManager
 
 	// Create a map (used like a set) to manage client connections
@@ -37,13 +35,11 @@ func NewHandler(config HandlerConfig) http.Handler {
 
 			// Bail out if the WebSocket connection could not be established
 			if err != nil {
-				logger.Warn("Failed to establish WebSocket connection", err)
 				return
 			}
 
 			// Close the connection early if it doesn't implement the graphql-ws protocol
 			if ws.Subprotocol() != "graphql-ws" {
-				logger.Warn("Connection does not implement the GraphQL WS protocol")
 				ws.Close()
 				return
 			}
@@ -53,10 +49,6 @@ func NewHandler(config HandlerConfig) http.Handler {
 				Authenticate: config.Authenticate,
 				EventHandlers: ConnectionEventHandlers{
 					Close: func(conn Connection) {
-						logger.WithFields(log.Fields{
-							"conn": conn.ID(),
-							"user": conn.User(),
-						}).Debug("Closing connection")
 
 						subscriptionManager.RemoveSubscriptions(conn)
 
@@ -67,12 +59,6 @@ func NewHandler(config HandlerConfig) http.Handler {
 						opID string,
 						data *StartMessagePayload,
 					) []error {
-						logger.WithFields(log.Fields{
-							"conn": conn.ID(),
-							"op":   opID,
-							"user": conn.User(),
-						}).Debug("Start operation")
-
 						return subscriptionManager.AddSubscription(conn, &Subscription{
 							ID:            opID,
 							Query:         data.Query,

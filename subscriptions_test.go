@@ -1,11 +1,9 @@
-package graphqlws_test
+package graphqlws
 
 import (
 	"testing"
 
-	"github.com/functionalfoundry/graphqlws"
 	"github.com/graphql-go/graphql"
-	log "github.com/sirupsen/logrus"
 )
 
 // Mock connection
@@ -25,7 +23,7 @@ func (c *mockWebSocketConnection) User() interface{} {
 
 func (c *mockWebSocketConnection) SendData(
 	opID string,
-	data *graphqlws.DataMessagePayload,
+	data *DataMessagePayload,
 ) {
 	// Do nothing
 }
@@ -34,16 +32,10 @@ func (c *mockWebSocketConnection) SendError(err error) {
 	// Do nothing
 }
 
-// Tests
-
-func TestMain(m *testing.M) {
-	log.SetLevel(log.ErrorLevel)
-}
-
 func TestSubscriptions_NewSubscriptionManagerCreatesInstance(t *testing.T) {
 	schema, _ := graphql.NewSchema(graphql.SchemaConfig{})
 
-	sm := graphqlws.NewSubscriptionManager(&schema)
+	sm := NewSubscriptionManager(&schema)
 	if sm == nil {
 		t.Fatal("NewSubscriptionManager fails in creating a new instance")
 	}
@@ -51,7 +43,7 @@ func TestSubscriptions_NewSubscriptionManagerCreatesInstance(t *testing.T) {
 
 func TestSubscriptions_SubscriptionsAreEmptyInitially(t *testing.T) {
 	schema, _ := graphql.NewSchema(graphql.SchemaConfig{})
-	sm := graphqlws.NewSubscriptionManager(&schema)
+	sm := NewSubscriptionManager(&schema)
 
 	if len(sm.Subscriptions()) > 0 {
 		t.Fatal("The subscriptions of SubscriptionManager are not empty initially")
@@ -60,14 +52,14 @@ func TestSubscriptions_SubscriptionsAreEmptyInitially(t *testing.T) {
 
 func TestSubscriptions_AddingInvalidSubscriptionsFails(t *testing.T) {
 	schema, _ := graphql.NewSchema(graphql.SchemaConfig{})
-	sm := graphqlws.NewSubscriptionManager(&schema)
+	sm := NewSubscriptionManager(&schema)
 
 	conn := mockWebSocketConnection{
 		id: "1",
 	}
 
 	// Try adding a subscription with nothing set
-	errors := sm.AddSubscription(&conn, &graphqlws.Subscription{})
+	errors := sm.AddSubscription(&conn, &Subscription{})
 
 	if len(errors) == 0 {
 		t.Error("AddSubscription does not fail when adding an empty subscription")
@@ -78,7 +70,7 @@ func TestSubscriptions_AddingInvalidSubscriptionsFails(t *testing.T) {
 	}
 
 	// Try adding a subscription with an invalid query
-	errors = sm.AddSubscription(&conn, &graphqlws.Subscription{
+	errors = sm.AddSubscription(&conn, &Subscription{
 		Query: "<<<Fooo>>>",
 	})
 
@@ -91,7 +83,7 @@ func TestSubscriptions_AddingInvalidSubscriptionsFails(t *testing.T) {
 	}
 
 	// Try adding a subscription with a query that doesn't match the schema
-	errors = sm.AddSubscription(&conn, &graphqlws.Subscription{
+	errors = sm.AddSubscription(&conn, &Subscription{
 		Query: "subscription { foo }",
 	})
 
@@ -114,18 +106,18 @@ func TestSubscriptions_AddingValidSubscriptionsWorks(t *testing.T) {
 				},
 			},
 		})})
-	sm := graphqlws.NewSubscriptionManager(&schema)
+	sm := NewSubscriptionManager(&schema)
 
 	conn := mockWebSocketConnection{
 		id: "1",
 	}
 
 	// Add a valid subscription
-	sub1 := graphqlws.Subscription{
+	sub1 := Subscription{
 		ID:         "1",
 		Connection: &conn,
 		Query:      "subscription { users }",
-		SendData: func(msg *graphqlws.DataMessagePayload) {
+		SendData: func(msg *DataMessagePayload) {
 			// Do nothing
 		},
 	}
@@ -145,11 +137,11 @@ func TestSubscriptions_AddingValidSubscriptionsWorks(t *testing.T) {
 	}
 
 	// Add another valid subscription
-	sub2 := graphqlws.Subscription{
+	sub2 := Subscription{
 		ID:         "2",
 		Connection: &conn,
 		Query:      "subscription { users }",
-		SendData: func(msg *graphqlws.DataMessagePayload) {
+		SendData: func(msg *DataMessagePayload) {
 			// Do nothing
 		},
 	}
@@ -178,18 +170,18 @@ func TestSubscriptions_AddingSubscriptionsTwiceFails(t *testing.T) {
 				},
 			},
 		})})
-	sm := graphqlws.NewSubscriptionManager(&schema)
+	sm := NewSubscriptionManager(&schema)
 
 	conn := mockWebSocketConnection{
 		id: "1",
 	}
 
 	// Add a valid subscription
-	sub := graphqlws.Subscription{
+	sub := Subscription{
 		ID:         "1",
 		Connection: &conn,
 		Query:      "subscription { users }",
-		SendData: func(msg *graphqlws.DataMessagePayload) {
+		SendData: func(msg *DataMessagePayload) {
 			// Do nothing
 		},
 	}
@@ -222,27 +214,27 @@ func TestSubscriptions_RemovingSubscriptionsWorks(t *testing.T) {
 				},
 			},
 		})})
-	sm := graphqlws.NewSubscriptionManager(&schema)
+	sm := NewSubscriptionManager(&schema)
 
 	conn := mockWebSocketConnection{
 		id: "1",
 	}
 
 	// Add two valid subscriptions
-	sub1 := graphqlws.Subscription{
+	sub1 := Subscription{
 		ID:         "1",
 		Connection: &conn,
 		Query:      "subscription { users }",
-		SendData: func(msg *graphqlws.DataMessagePayload) {
+		SendData: func(msg *DataMessagePayload) {
 			// Do nothing
 		},
 	}
 	sm.AddSubscription(&conn, &sub1)
-	sub2 := graphqlws.Subscription{
+	sub2 := Subscription{
 		ID:         "2",
 		Connection: &conn,
 		Query:      "subscription { users }",
-		SendData: func(msg *graphqlws.DataMessagePayload) {
+		SendData: func(msg *DataMessagePayload) {
 			// Do nothing
 		},
 	}
@@ -275,44 +267,44 @@ func TestSubscriptions_RemovingSubscriptionsOfAConnectionWorks(t *testing.T) {
 				},
 			},
 		})})
-	sm := graphqlws.NewSubscriptionManager(&schema)
+	sm := NewSubscriptionManager(&schema)
 
 	conn1 := mockWebSocketConnection{id: "1"}
 	conn2 := mockWebSocketConnection{id: "2"}
 
 	// Add four valid subscriptions
-	sub1 := graphqlws.Subscription{
+	sub1 := Subscription{
 		ID:         "1",
 		Connection: &conn1,
 		Query:      "subscription { users }",
-		SendData: func(msg *graphqlws.DataMessagePayload) {
+		SendData: func(msg *DataMessagePayload) {
 			// Do nothing
 		},
 	}
 	sm.AddSubscription(&conn1, &sub1)
-	sub2 := graphqlws.Subscription{
+	sub2 := Subscription{
 		ID:         "2",
 		Connection: &conn1,
 		Query:      "subscription { users }",
-		SendData: func(msg *graphqlws.DataMessagePayload) {
+		SendData: func(msg *DataMessagePayload) {
 			// Do nothing
 		},
 	}
 	sm.AddSubscription(&conn1, &sub2)
-	sub3 := graphqlws.Subscription{
+	sub3 := Subscription{
 		ID:         "1",
 		Connection: &conn2,
 		Query:      "subscription { users }",
-		SendData: func(msg *graphqlws.DataMessagePayload) {
+		SendData: func(msg *DataMessagePayload) {
 			// Do nothing
 		},
 	}
 	sm.AddSubscription(&conn2, &sub3)
-	sub4 := graphqlws.Subscription{
+	sub4 := Subscription{
 		ID:         "2",
 		Connection: &conn2,
 		Query:      "subscription { users }",
-		SendData: func(msg *graphqlws.DataMessagePayload) {
+		SendData: func(msg *DataMessagePayload) {
 			// Do nothing
 		},
 	}
